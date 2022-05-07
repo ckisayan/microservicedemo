@@ -1,5 +1,3 @@
-using EventBus.Messages.Common;
-using MassTransit;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -8,16 +6,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
-using Ordering.API.EventBusConsumer;
-//using Ordering.API.EventBusConsumer;
-using Ordering.Application;
-using Ordering.Infrastructure;
+using Shopping.Aggregator.Services;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Ordering.Api
+namespace Shopping.Aggregator
 {
     public class Startup
     {
@@ -31,30 +26,20 @@ namespace Ordering.Api
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddApplicationServices();
-            services.AddInfrastructureServices(Configuration);
+            services.AddHttpClient<ICatalogService, CatalogService>(c =>
+                   c.BaseAddress = new Uri(Configuration["ApiSettings:CatalogUrl"]));
 
-            // MassTransit-RabbitMQ Configuration
+            services.AddHttpClient<IBasketService, BasketService>(c =>
+                c.BaseAddress = new Uri(Configuration["ApiSettings:BasketUrl"]));
 
-            services.AddMassTransit(config => {
-                config.AddConsumer<BasketCheckoutConsumer>();
-                config.UsingRabbitMq((ctx, cfg) => {
-                    cfg.Host(Configuration["EventBusSettings:HostAddress"]);
-                    cfg.ReceiveEndpoint(EventBusConstants.BasketCheckoutQueue, c =>
-                    {
-                        c.ConfigureConsumer<BasketCheckoutConsumer>(ctx);
-                    });
-                });
-            }); ;//AMQP protocol for rabit MQRabbitMQ... start with protocol://username:pwd@servername:port
+            services.AddHttpClient<IOrderService, OrderService>(c =>
+                c.BaseAddress = new Uri(Configuration["ApiSettings:OrderingUrl"]));
 
-            //services.AddMassTransitHostedService();  // with 8.0 not required
 
-            services.AddAutoMapper(typeof(Startup));
-            services.AddScoped<BasketCheckoutConsumer>();
             services.AddControllers();
             services.AddSwaggerGen(c =>
             {
-                c.SwaggerDoc("v1", new OpenApiInfo { Title = "Ordering.Apis", Version = "v1" });
+                c.SwaggerDoc("v1", new OpenApiInfo { Title = "Shopping.Aggregator", Version = "v1" });
             });
         }
 
@@ -65,7 +50,7 @@ namespace Ordering.Api
             {
                 app.UseDeveloperExceptionPage();
                 app.UseSwagger();
-                app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Ordering.Apis v1"));
+                app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Shopping.Aggregator v1"));
             }
 
             app.UseRouting();
